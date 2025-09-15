@@ -8,10 +8,13 @@ on:
   workflow_dispatch: # Permite rodar manualmente também
 
 jobs:
-    build-and-static-analysis:
+  # ------ TAREFA 1 (SAST) e TAREFA 3 (SCA) ------
+  build-and-static-analysis:
     name: Build, SCA e SAST
     runs-on: ubuntu-latest
 
+    # Permissões necessárias para que o pipeline possa escrever
+    # os resultados na aba "Security" do GitHub.
     permissions:
       security-events: write
       actions: read
@@ -42,11 +45,6 @@ jobs:
         with:
           format: sarif
           outputFile: semgrep.sarif
-        # Ignora erros do Semgrep para que nosso passo de debug sempre rode
-        continue-on-error: true
-
-      - name: Verificar arquivos criados
-        run: ls -la
 
       - name: Upload Semgrep SARIF to GitHub
         uses: github/codeql-action/upload-sarif@v3
@@ -54,9 +52,11 @@ jobs:
           sarif_file: semgrep.sarif
         if: always()
 
+  # ------ TAREFA 2 (DAST) ------
   dynamic-analysis:
     name: Análise Dinâmica (DAST)
     runs-on: ubuntu-latest
+    # Este job só roda se o job anterior for bem-sucedido
     needs: build-and-static-analysis
 
     steps:
@@ -74,7 +74,6 @@ jobs:
         with:
           target: 'http://127.0.0.1:3000/'
           cmd_options: '-a'
-          # Alterado para 'warn' para que o pipeline não falhe aqui e possamos ver o relatório.
-          # Em um cenário real, manteríamos 'High'.
+          # Alterado para 'warn' para que o pipeline não falhe e possamos ver o relatório.
           fail_on_risk: 'warn'
 
