@@ -8,12 +8,10 @@ on:
   workflow_dispatch: # Permite rodar manualmente também
 
 jobs:
-  build-and-static-analysis:
+    build-and-static-analysis:
     name: Build, SCA e SAST
     runs-on: ubuntu-latest
 
-    # Permissões necessárias para que o pipeline possa escrever
-    # os resultados na aba "Security" do GitHub.
     permissions:
       security-events: write
       actions: read
@@ -37,7 +35,6 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          # Ajustamos para não falhar aqui e permitir que o SAST rode
           args: --severity-threshold=critical --all-projects
 
       - name: Executar Análise Estática (SAST) com Semgrep
@@ -45,13 +42,16 @@ jobs:
         with:
           format: sarif
           outputFile: semgrep.sarif
+        # Ignora erros do Semgrep para que nosso passo de debug sempre rode
+        continue-on-error: true
+
+      - name: Verificar arquivos criados
+        run: ls -la
 
       - name: Upload Semgrep SARIF to GitHub
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
-        # <<< CORREÇÃO DE ALINHAMENTO AQUI
-        # Esta linha deve estar alinhada com 'name', 'uses', e 'with' acima.
         if: always()
 
   dynamic-analysis:
