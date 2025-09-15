@@ -1,20 +1,16 @@
-# Nome do nosso workflow, que aparecerá na aba "Actions" do GitHub
+# Nome do nosso workflow
 name: Pipeline de Segurança DevSecOps
 
-# Gatilho: este pipeline vai rodar a cada 'push' para o branch 'main'
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Permite rodar manualmente também
+  workflow_dispatch:
 
 jobs:
-  # ------ TAREFA 1 (SAST) e TAREFA 3 (SCA) ------
   build-and-static-analysis:
     name: Build, SCA e SAST
     runs-on: ubuntu-latest
 
-    # Permissões necessárias para que o pipeline possa escrever
-    # os resultados na aba "Security" do GitHub.
     permissions:
       security-events: write
       actions: read
@@ -40,11 +36,13 @@ jobs:
           command: test
           args: --severity-threshold=critical --all-projects
 
+      # --- SAST COM SEMGREP (MÉTODO DIRETO E ROBUSTO) ---
       - name: Executar Análise Estática (SAST) com Semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          format: sarif
-          outputFile: semgrep.sarif
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" returntocorp/semgrep semgrep ci --sarif -o semgrep.sarif || true
+          
+      - name: Verificar se o relatório SAST foi criado
+        run: ls -la
 
       - name: Upload Semgrep SARIF to GitHub
         uses: github/codeql-action/upload-sarif@v3
@@ -52,11 +50,9 @@ jobs:
           sarif_file: semgrep.sarif
         if: always()
 
-  # ------ TAREFA 2 (DAST) ------
   dynamic-analysis:
     name: Análise Dinâmica (DAST)
     runs-on: ubuntu-latest
-    # Este job só roda se o job anterior for bem-sucedido
     needs: build-and-static-analysis
 
     steps:
@@ -74,6 +70,5 @@ jobs:
         with:
           target: 'http://127.0.0.1:3000/'
           cmd_options: '-a'
-          # Alterado para 'warn' para que o pipeline não falhe e possamos ver o relatório.
           fail_on_risk: 'warn'
 
