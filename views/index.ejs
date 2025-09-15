@@ -1,0 +1,16 @@
+    <!DOCTYPE html>
+    <html lang="pt-br">
+    <head>
+      <meta charset="UTF-8">
+      <title>App Vulnerável</title>
+      <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+      </style>
+    </head>
+    <body>
+      <h1>Olá, <%- nome %>!</h1>
+      <p>Teste a vulnerabilidade de XSS adicionando 
+        <code>?nome=&lt;script&gt;alert('XSS')&lt;/script&gt;</code> na URL.
+      </p>
+    </body>
+    </html>

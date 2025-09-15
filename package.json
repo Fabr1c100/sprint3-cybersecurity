@@ -1,0 +1,13 @@
+    {
+      "name": "app-vulneravel",
+      "version": "1.0.0",
+      "description": "App de exemplo para sprint DevSecOps",
+      "main": "app.js",
+      "scripts": {
+        "start": "node app.js"
+      },
+      "dependencies": {
+        "ejs": "2.5.7",
+        "express": "4.16.3"
+      }
+    }
