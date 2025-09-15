@@ -1,0 +1,80 @@
+# Nome do nosso workflow, que aparecerá na aba "Actions" do GitHub
+name: Pipeline de Segurança DevSecOps
+
+# Gatilho: este pipeline vai rodar a cada 'push' para o branch 'main'
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Permite rodar manualmente também
+
+jobs:
+  # ------ TAREFA 1 (SAST) e TAREFA 3 (SCA) ------
+  build-and-static-analysis:
+    name: Build, SCA e SAST
+    runs-on: ubuntu-latest # O pipeline roda em uma máquina virtual com Ubuntu
+
+    steps:
+      # 1. Clona o código do seu repositório para a máquina virtual
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      # 2. Configura o ambiente Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # 3. Instala as dependências da aplicação
+      - name: Instalar dependências
+        run: npm install
+
+      # 4. TAREFA 3: Roda o SCA com Snyk
+      # Ele vai usar o token que configuramos nos secrets do repositório
+      # O '--fail-on=all' é o nosso "Quality Gate": se encontrar qualquer vulnerabilidade, o pipeline falha aqui.
+      - name: Executar Scan de Dependências (SCA) com Snyk
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: --fail-on=all --all-projects
+
+      # 5. TAREFA 1: Roda o SAST com Semgrep
+      # A ação do Semgrep já vem com uma política padrão que detecta problemas críticos
+      # Se encontrar algo, o passo falhará, bloqueando o pipeline.
+      - name: Executar Análise Estática (SAST) com Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }} # Opcional, para ver dashboards no Semgrep
+          generateSarif: true
+
+  # ------ TAREFA 2 (DAST) ------
+  dynamic-analysis:
+    name: Análise Dinâmica (DAST)
+    runs-on: ubuntu-latest
+    # Este job só roda se o job anterior (build-and-static-analysis) for bem-sucedido
+    needs: build-and-static-analysis
+
+    steps:
+      # 1. Clona o código novamente
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      # 2. Constrói a imagem Docker da nossa aplicação
+      - name: Construir imagem Docker
+        run: docker build -t app-vulneravel:latest .
+
+      # 3. Sobe a nossa aplicação em um container Docker para o ZAP poder acessá-la
+      # O '&' no final faz o container rodar em background
+      - name: Iniciar container da aplicação
+        run: docker run -d --name meu-app -p 3000:3000 app-vulneravel:latest
+
+      # 4. Executa o DAST com OWASP ZAP Baseline Scan
+      # O ZAP vai atacar a aplicação rodando em 'http://127.0.0.1:3000'
+      # O 'fail_on_risk' é nosso "Quality Gate": se encontrar um risco 'High', o job falha.
+      - name: Executar Análise Dinâmica (DAST) com OWASP ZAP
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://127.0.0.1:3000/'
+          cmd_options: '-a'
+          fail_on_risk: 'High'
