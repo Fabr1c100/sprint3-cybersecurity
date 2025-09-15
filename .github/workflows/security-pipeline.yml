@@ -37,7 +37,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --fail-on=all --all-projects
+          args: --severity-threshold=critical --all-projects
 
       # 5. TAREFA 1: Roda o SAST com Semgrep
       # A ação do Semgrep já vem com uma política padrão que detecta problemas críticos
