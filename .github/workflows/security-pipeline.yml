@@ -11,42 +11,54 @@ jobs:
   # ------ TAREFA 1 (SAST) e TAREFA 3 (SCA) ------
   build-and-static-analysis:
     name: Build, SCA e SAST
-    runs-on: ubuntu-latest # O pipeline roda em uma máquina virtual com Ubuntu
+    runs-on: ubuntu-latest
+
+    # Permissões necessárias para que o pipeline possa escrever
+    # os resultados na aba "Security" do GitHub.
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
 
     steps:
-      # 1. Clona o código do seu repositório para a máquina virtual
       - name: Checkout do código
         uses: actions/checkout@v3
 
-      # 2. Configura o ambiente Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      # 3. Instala as dependências da aplicação
       - name: Instalar dependências
         run: npm install
 
-      # 4. TAREFA 3: Roda o SCA com Snyk
-      # Ele vai usar o token que configuramos nos secrets do repositório
-      # O '--fail-on=all' é o nosso "Quality Gate": se encontrar qualquer vulnerabilidade, o pipeline falha aqui.
       - name: Executar Scan de Dependências (SCA) com Snyk
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
+          # Ajustamos para não falhar aqui e permitir que o SAST rode
           args: --severity-threshold=critical --all-projects
 
-      # 5. TAREFA 1: Roda o SAST com Semgrep
-      # A ação do Semgrep já vem com uma política padrão que detecta problemas críticos
-      # Se encontrar algo, o passo falhará, bloqueando o pipeline.
+      # --- SAST COM SEMGREP (COM A CORREÇÃO) ---
+
       - name: Executar Análise Estática (SAST) com Semgrep
         uses: returntocorp/semgrep-action@v1
         with:
-          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }} # Opcional, para ver dashboards no Semgrep
+          # Esta linha é a que gera o arquivo de relatório
           generateSarif: true
+
+      - name: Upload Semgrep SARIF to GitHub
+        # Esta é a ação oficial do GitHub para fazer o upload de relatórios
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          # O arquivo que o Semgrep gerou no passo anterior
+          sarif_file: semgrep.sarif
+        # Condição importante: Rode este passo sempre, mesmo que o Semgrep
+        # falhe ao encontrar vulnerabilidades. Isso garante que o relatório
+        # seja sempre enviado para a aba "Security".
+        if: always()
 
   # ------ TAREFA 2 (DAST) ------
   dynamic-analysis:
